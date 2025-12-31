@@ -1,79 +1,134 @@
-# Rag_Application
+# 📚 RAG PDF Chat Application
 
-## Installation
+A full-stack **Retrieval-Augmented Generation (RAG)** application that allows users to upload private PDF documents and chat with them using Large Language Models (LLMs).  
+The system retrieves relevant information from documents using vector search and generates accurate, source-grounded answers in real time.
 
-Install the LangChain CLI if you haven't yet
+---
+<img width="1902" height="968" alt="image" src="https://github.com/user-attachments/assets/4abfc000-1db3-4f23-aa13-fb48e8751a2c" />
+
+
+## 🚀 Features
+
+- 📄 Upload multiple PDF documents
+- 🔍 Semantic search using vector embeddings
+- 🤖 LLM-powered question answering (RAG)
+- ⚡ Real-time streaming responses (Server-Sent Events)
+- 📌 Source citation from original PDFs
+- 🐳 Docker-based vector database (pgvector)
+- 🌐 Modern React frontend (Vite + TypeScript)
+
+---
+
+## 🏗️ Architecture Overview
+
+Frontend (React + Vite)
+│
+│ HTTP / SSE
+▼
+Backend (FastAPI + LangServe)
+│
+│ Vector Search
+▼
+PostgreSQL + pgvector
+
+
+---
+
+## 🧠 Tech Stack
+
+### Frontend
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- Server-Sent Events (SSE)
+
+### Backend
+- FastAPI
+- LangChain
+- LangServe
+- Python 3.11
+- Poetry
+
+### Vector Database
+- PostgreSQL
+- pgvector
+- Docker (local development)
+
+---
+
+## 📂 Project Structure
+
+rag-application/
+├── frontend/ # React + Vite frontend
+├── app/ # FastAPI backend (LangServe)
+├── packages/ # Shared / helper packages
+├── tests/ # Backend tests
+├── Dockerfile # Backend container
+├── pyproject.toml # Poetry dependencies
+├── poetry.lock
+├── README.md
+└── .gitignore
+
+
+---
+
+## ⚙️ Local Setup
+
+### 1️⃣ Clone the Repository
 
 ```bash
-pip install -U langchain-cli
-```
+git clone https://github.com/Nikhil-kesarwani111/rag-application.git
+cd rag-application
 
-## Adding packages
+Backend Setup (FastAPI + LangServe)
+poetry install
+poetry shell
+uvicorn app.server:app --reload
 
-```bash
-# adding packages from
-# https://github.com/langchain-ai/langchain/tree/master/templates
-langchain app add $PROJECT_NAME
+### 2️⃣ Backend Setup (FastAPI + LangServe)
+poetry install
+poetry shell
+uvicorn app.server:app --reload
 
-# adding custom GitHub repo packages
-langchain app add --repo $OWNER/$REPO
-# or with whole git string (supports other git providers):
-# langchain app add git+https://github.com/hwchase17/chain-of-verification
 
-# with a custom api mount point (defaults to `/{package_name}`)
-langchain app add $PROJECT_NAME --api_path=/my/custom/path/rag
-```
+Backend runs at:
 
-Note: you remove packages by their api path
+http://127.0.0.1:8000
 
-```bash
-langchain app remove my/custom/path/rag
-```
 
-## Setup LangSmith (Optional)
+LangServe Playground:
 
-LangSmith will help us trace, monitor and debug LangChain applications.
-You can sign up for LangSmith [here](https://smith.langchain.com/).
-If you don't have access, you can skip this section
+http://127.0.0.1:8000/rag/playground
 
-```shell
-export LANGSMITH_TRACING=true
-export LANGSMITH_API_KEY=<your-api-key>
-export LANGSMITH_PROJECT=<your-project>  # if not specified, defaults to "default"
-```
+3️⃣ Frontend Setup (React)
+cd frontend
+npm install
+npm run dev
 
-## Launch LangServe
 
-```bash
-langchain serve
-```
+Frontend runs at:
 
-## Running in Docker
+http://localhost:5173
 
-This project folder includes a Dockerfile that allows you to easily build and host your LangServe app.
+4️⃣ Vector Database (pgvector via Docker)
+docker run -d \
+  -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=ragdb \
+  pgvector/pgvector:pg16
 
-### Building the Image
+🔐 Environment Variables
 
-To build the image, you simply:
+Create a .env file (do not commit it):
 
-```shell
-docker build . -t my-langserve-app
-```
+DATABASE_URL=postgresql://user:password@host:5432/db
+OPENAI_API_KEY=your_key_here
+GOOGLE_API_KEY=your_key_here
 
-If you tag your image with something other than `my-langserve-app`,
-note it for use in the next step.
-
-### Running the Image Locally
-
-To run the image, you'll need to include any environment variables
-necessary for your application.
-
-In the below example, we inject the `OPENAI_API_KEY` environment
-variable with the value set in my local environment
-(`$OPENAI_API_KEY`)
-
-We also expose port 8080 with the `-p 8080:8080` option.
-
-```shell
-docker run -e OPENAI_API_KEY=$OPENAI_API_KEY -p 8080:8080 my-langserve-app
-```
+🔄 API Endpoints
+Method	Endpoint	Description
+POST	/upload	Upload PDF files
+POST	/load-and-process-pdfs	Process PDFs into vectors
+POST	/rag/stream	Stream chat responses
+GET	/rag/static/{file}	Download source PDF
