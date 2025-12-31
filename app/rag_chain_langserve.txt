@@ -1,0 +1,135 @@
+import os
+import asyncio
+from operator import itemgetter
+from typing_extensions import TypedDict
+
+from dotenv import load_dotenv
+from sqlalchemy import text
+
+from langchain_community.vectorstores.pgvector import PGVector
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableLambda
+
+from langchain_google_genai import (
+    ChatGoogleGenerativeAI,
+    GoogleGenerativeAIEmbeddings
+)
+
+load_dotenv()
+
+print("🚀 Loading RAG chain...")
+
+# ---------------------------------------------------------
+# 1. PGVECTOR STORE
+# ---------------------------------------------------------
+vector_store = PGVector(
+    collection_name="collection164",
+    connection_string="postgresql+psycopg://postgres:postgres@localhost:5432/rag_app",
+    embedding_function=GoogleGenerativeAIEmbeddings(
+        model="text-embedding-004",
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    ),
+)
+
+print("📦 Vector store loaded")
+
+# ---- Count rows in database (works for all PGVector versions) ----
+def get_vector_count(store: PGVector):
+    try:
+        with store._bind.connect() as conn:
+            result = conn.execute(text(f"SELECT COUNT(*) FROM {store.table_name}"))
+            return result.scalar()
+    except Exception as e:
+        print("⚠️ Error counting vectors:", e)
+        return 0
+
+from sqlalchemy import text
+
+def get_vector_count(store: PGVector):
+    try:
+        with store._bind.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM langchain_pg_embedding"))
+            return result.scalar()
+    except Exception as e:
+        print("⚠️ Error counting vectors:", e)
+        return 0
+    
+count = get_vector_count(vector_store)
+print("🔢 Vector count:", count)
+
+
+# ---------------------------------------------------------
+# 2. PROMPT
+# ---------------------------------------------------------
+template = """
+Use ONLY the context provided.
+If the answer is missing, say "I don't know".
+
+Context:
+{context}
+
+Question:
+{question}
+"""
+
+ANSWER_PROMPT = ChatPromptTemplate.from_template(template)
+
+# ---------------------------------------------------------
+# 3. GEMINI MODEL (Correct version)
+# ---------------------------------------------------------
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0,
+    streaming=True,
+    google_api_key=os.getenv("GOOGLE_API_KEY"),   # <-- FIXED
+)
+
+print("🧠 Gemini LLM loaded: gemini-2.5-flash")
+
+# ---------------------------------------------------------
+# 4. INPUT TYPE
+# ---------------------------------------------------------
+class RagInput(TypedDict):
+    question: str
+
+# ---------------------------------------------------------
+# 5. RETRIEVER DEBUG WRAPPER
+# ---------------------------------------------------------
+async def debug_retriever(question: str):
+    print("\n❓ Query:", question)
+
+    retriever = vector_store.as_retriever(
+        search_type="similarity",
+        search_kwargs={"k": 4},
+    )
+
+    # Call retriever in thread
+    docs = await asyncio.get_running_loop().run_in_executor(
+        None, retriever.invoke, question
+    )
+
+    print(f"📄 Retrieved {len(docs)} documents")
+
+    for i, d in enumerate(docs[:3]):
+        print(f"\n--- Doc {i+1} ---")
+        print(d.page_content[:300], "...\n")
+
+    return docs
+
+debug_runnable = RunnableLambda(debug_retriever)
+
+# ---------------------------------------------------------
+# 6. FINAL RAG CHAIN
+# ---------------------------------------------------------
+final_chain = (
+    {
+        "context": itemgetter("question") | debug_runnable,
+        "question": itemgetter("question"),
+    }
+    | ANSWER_PROMPT
+    | llm
+    | StrOutputParser()
+).with_types(input_type=RagInput)
+
+print("🎉 RAG chain ready!")
