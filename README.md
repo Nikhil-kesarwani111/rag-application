@@ -5,7 +5,9 @@ The system retrieves relevant information from documents using vector search and
 
 ---
 <img width="1902" height="968" alt="image" src="https://github.com/user-attachments/assets/4abfc000-1db3-4f23-aa13-fb48e8751a2c" />
-##🎥 Project Demo
+
+
+##  Project Demo
 
 [![Watch the demo](https://img.youtube.com/vi/UmgLljbn0nQ/0.jpg)](https://youtu.be/UmgLljbn0nQ)
 
